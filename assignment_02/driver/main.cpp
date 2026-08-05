@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <string>
 #include <sstream>
+#include <vector>
+#include <string>
 using namespace std;
 
 int main() {
@@ -14,60 +15,57 @@ int main() {
             cerr << "Error: Could not open file " << filename << endl;
             continue;
         }
-          if (input_list.peek() == ifstream::traits_type::eof()) {
+        if (input_list.peek() == ifstream::traits_type::eof()) {
             cerr << "Invalid input: File " << filename << " is empty." << endl;
             continue;
         }
 
         input_list >> V >> E;
-        input_list.ignore();
 
         char choice;
         cout << "Is the graph in " << filename << " weighted? (y/n): ";
         cin >> choice;
         bool is_weighted = (choice == 'y' || choice == 'Y');
 
-        int* offset = new int[V + 1]();         // row_ptr
-        int* Intermediataries = new int[2 * E]; // col_idx
-        int* weight = new int[2 * E];           // optional weights
-
-        
+        vector<int> row_ptr(V + 1, 0);
+        vector<int> col_idx;
+        vector<int> weights;
 
         string line;
         int last = 0;
-        int neighbor_count = 0;
-        int node_index = 0;
 
         while (getline(input_list, line)) {
             if (line.rfind("SOURCE", 0) == 0) break; // stop at SOURCE line
 
             stringstream node_details(line);
+            int node_index, neighbor_count;
             node_details >> node_index >> neighbor_count;
 
-            if (!is_weighted) {
-                for (int i = last; i < last + neighbor_count; i++) {
-                    node_details >> Intermediataries[i];
+            for (int i = 0; i < neighbor_count; i++) {
+                int neighbor, w = 1;
+                if (is_weighted) {
+                    node_details >> neighbor >> w;
+                    weights.push_back(w);
+                } else {
+                    node_details >> neighbor;
                 }
-            } else {
-                for (int i = last; i < last + neighbor_count; i++) {
-                    node_details >> Intermediataries[i] >> weight[i];
-                }
+                col_idx.push_back(neighbor);
             }
 
             last += neighbor_count;
-            offset[node_index + 1] = last;
+            row_ptr[node_index + 1] = last;
         }
 
         cout << "File: " << filename << "\n";
-        cout << "offset: ";
-        for (int i = 0; i < V; i++) cout << offset[i] << " ";
-        cout << "\n Intermediataries: ";
-        for (int i = 0; i < last; i++) cout << Intermediataries[i] << " ";
+        cout << "row_ptr: ";
+        for (int i = 0; i <= V; i++) cout << row_ptr[i] << " ";
+        cout << "\ncol_idx: ";
+        for (int x : col_idx) cout << x << " ";
+        if (is_weighted) {
+            cout << "\nweights: ";
+            for (int w : weights) cout << w << " ";
+        }
         cout << "\n\n";
-
-        delete[] offset;
-        delete[] Intermediataries;
-        delete[] weight;
     }
 
     return 0;

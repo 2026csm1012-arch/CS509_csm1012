@@ -1,98 +1,155 @@
+#include "../src/CSR.h"
+#include "../src/GraphAlgo.h"
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <string>
+#include <chrono>
+#include <iomanip>
+#include <algorithm>
 
 using namespace std;
 
-int main()
+// Helper to trim trailing spaces and carriage returns (\r) from string
+string trimTrailing(const string &str)
 {
-    int V, E;
-
-    for (string filename : {"test (1).txt", "test (2).txt", "test (3).txt", "test (4).txt", "test (5).txt"})
+    string s = str;
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r'))
     {
-        ifstream input_list("../tests/" + filename);
+        s.pop_back();
+    }
+    return s;
+}
 
-        if (!input_list.is_open())
+vector<string> readExpectedOutput(const string &filepath)
+{
+    vector<string> lines;
+    ifstream file(filepath);
+    string line;
+    while (getline(file, line))
+    {
+        string trimmed = trimTrailing(line);
+        if (!trimmed.empty())
+            lines.push_back(trimmed);
+    }
+    return lines;
+}
+
+void runTestCase(const string &testBaseName, bool isWeighted, int algoChoice)
+{
+    string inputPath = "tests/" + testBaseName + ".txt";
+    string algoSubfolder = (algoChoice == 1) ? "Bellman-Ford" : "Floyd-Warshall";
+    string expectedPath = "tests/" + algoSubfolder + "/" + testBaseName + "_expected.txt";
+
+    CSRGraph graph(isWeighted);
+
+    // 1. Time graph loading
+    auto loadStart = chrono::high_resolution_clock::now();
+    if (!graph.loadFromFile(inputPath))
+    {
+        cerr << "Failed to load " << inputPath << "\n";
+        return;
+    }
+    auto loadEnd = chrono::high_resolution_clock::now();
+    double loadTime = chrono::duration<double, milli>(loadEnd - loadStart).count();
+
+    // 2. Time algorithm execution
+    auto algoStart = chrono::high_resolution_clock::now();
+    vector<string> actualOutput;
+
+    if (algoChoice == 1)
+    { // Bellman-Ford
+        int source = graph.getSource();
+        auto result = GraphAlgorithms::bellmanFord(graph, source);
+        auto algoEnd = chrono::high_resolution_clock::now();
+        double algoTime = chrono::duration<double, milli>(algoEnd - algoStart).count();
+
+        cout << "\n----------------------------------------\n";
+        cout << "Test: " << testBaseName << ".txt | Algorithm: Bellman-Ford\n";
+        cout << "Load Time: " << fixed << setprecision(3) << loadTime << " ms | ";
+        cout << "Execution Time: " << fixed << setprecision(3) << algoTime << " ms\n";
+
+        if (result.has_negative_cycle)
         {
-            cerr << "Error: Could not open file " << filename << endl;
-            continue;
+            actualOutput.push_back("NEGATIVE_CYCLE");
         }
-        if (input_list.peek() == ifstream::traits_type::eof())
+        else
         {
-            cerr << "Invalid input: File " << filename << " is empty." << endl;
-            continue;
-        }
-
-        input_list >> V >> E;
-        string st;
-        getline(input_list, st);
-
-        char choice;
-        cout << "Is the graph in " << filename << " weighted? (y/n): ";
-        cin >> choice;
-        bool is_weighted = (choice == 'y' || choice == 'Y');
-
-        // arrays
-        vector<int> offset(V + 1);
-        vector<int> intermediateries;
-        vector<int> weights;
-
-        // node list with neighbor starts
-        string line;
-        int itm = 0;
-
-        while (getline(input_list, line))
-        {
-            if (line.rfind("SOURCE", 0) == 0)
+            for (int i = 0; i < graph.getVertices(); ++i)
             {
-                break;
-            }
-
-            stringstream node_details(line);
-
-            int node_index, neighbor_count;
-            node_details >> node_index >> neighbor_count;
-            cout << "offset: " << offset[node_index] << " node index: " << node_index << " node neighbor: " << neighbor_count << endl;
-
-            offset[node_index] = itm;
-
-            for (int i = 0; i < neighbor_count; i++)
-            {
-                int neighbor, w = 1;
-
-                if (is_weighted)
+                if (result.distances[i] >= GRAPH_INF)
                 {
-                    node_details >> neighbor >> w;
-                    weights.push_back(w);
+                    actualOutput.push_back(trimTrailing(to_string(source) + " -> " + to_string(i) + " = INF"));
                 }
                 else
                 {
-                    node_details >> neighbor;
+                    actualOutput.push_back(trimTrailing(to_string(source) + " -> " + to_string(i) + " = " + to_string(result.distances[i])));
                 }
-                cout << neighbor;
-                intermediateries.push_back(neighbor);
-                itm++;
             }
-            cout << endl;
         }
-        offset[V]=itm;
+    }
+    else if (algoChoice == 2)
+    { // Floyd-Warshall
+        auto result = GraphAlgorithms::floydWarshall(graph);
+        auto algoEnd = chrono::high_resolution_clock::now();
+        double algoTime = chrono::duration<double, milli>(algoEnd - algoStart).count();
 
-        cout << "File: " << filename << "\n";
-        cout << "offset: ";
-        for (int i : offset)
-            cout << i << " ";
-        cout << "\nneigh: ";
-        for (int x : intermediateries)
-            cout << x << " ";
-        if (is_weighted)
+        cout << "\n----------------------------------------\n";
+        cout << "Test: " << testBaseName << ".txt | Algorithm: Floyd-Warshall\n";
+        cout << "Load Time: " << fixed << setprecision(3) << loadTime << " ms | ";
+        cout << "Execution Time: " << fixed << setprecision(3) << algoTime << " ms\n";
+
+        if (result.has_negative_cycle)
         {
-            cout << "\nweights: ";
-            for (int w : weights)
-                cout << w << " ";
+            actualOutput.push_back("NEGATIVE_CYCLE");
         }
-        cout << "\n\n";
+        else
+        {
+            for (int i = 0; i < graph.getVertices(); ++i)
+            {
+                string row = "";
+                for (int j = 0; j < graph.getVertices(); ++j)
+                {
+                    if (result.distances[i][j] >= GRAPH_INF)
+                        row += "INF ";
+                    else
+                        row += to_string(result.distances[i][j]) + " ";
+                }
+                actualOutput.push_back(trimTrailing(row));
+            }
+        }
+    }
+
+    // 3. Verification step
+    vector<string> expectedOutput = readExpectedOutput(expectedPath);
+    if (!expectedOutput.empty())
+    {
+        bool match = (actualOutput == expectedOutput);
+        cout << "Verification: [" << (match ? "PASSED" : "FAILED") << "]\n";
+    }
+    else
+    {
+        cout << "Verification: [NO EXPECTED FILE FOUND]\n";
+    }
+    cout << "----------------------------------------\n";
+}
+
+int main()
+{
+    vector<string> testBases = {"test1", "test2", "test3", "test4", "test5"};
+
+    int algoChoice;
+    cout << "Select Algorithm:\n1. Bellman-Ford\n2. Floyd-Warshall\nChoice: ";
+    cin >> algoChoice;
+
+    char isWeightedChar;
+    cout << "Are graphs weighted? (y/n): ";
+    cin >> isWeightedChar;
+    bool isWeighted = (isWeightedChar == 'y' || isWeightedChar == 'Y');
+
+    for (const auto &testName : testBases)
+    {
+        runTestCase(testName, isWeighted, algoChoice);
     }
 
     return 0;

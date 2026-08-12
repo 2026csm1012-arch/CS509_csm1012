@@ -1,156 +1,572 @@
 #include "../src/CSR.h"
 #include "../src/GraphAlgo.h"
+
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <chrono>
 #include <iomanip>
-#include <algorithm>
 
 using namespace std;
+using namespace chrono;
 
-// Helper to trim trailing spaces and carriage returns (\r) from string
-string trimTrailing(const string &str)
-{
-    string s = str;
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r'))
-    {
-        s.pop_back();
-    }
-    return s;
-}
 
-vector<string> readExpectedOutput(const string &filepath)
+// ============================================================
+// BELLMAN-FORD EXPECTED OUTPUT
+//
+// Expected:
+//
+// Execution Time : 0.00792 ms
+// Bellman-Ford Shortest Path Distances
+// Source: 0
+//
+// 0 -> 0 : 0
+// 0 -> 1 : 36
+// ...
+//
+// We ignore execution time and headings.
+// ============================================================
+
+vector<string> readExpectedBellmanFord(
+    const string &path)
 {
-    vector<string> lines;
-    ifstream file(filepath);
+    vector<string> result;
+
+    ifstream file(path);
+
+    if (!file)
+        return result;
+
     string line;
+
+    bool readingDistances = false;
+
     while (getline(file, line))
     {
-        string trimmed = trimTrailing(line);
-        if (!trimmed.empty())
-            lines.push_back(trimmed);
+        if (!line.empty() &&
+            line.back() == '\r')
+        {
+            line.pop_back();
+        }
+
+        if (line.rfind("Source:", 0) == 0)
+        {
+            readingDistances = true;
+            continue;
+        }
+
+        if (!readingDistances)
+            continue;
+
+        if (line.empty())
+            continue;
+
+        result.push_back(line);
     }
-    return lines;
+
+    return result;
 }
 
-void runTestCase(const string &testBaseName, bool isWeighted, int algoChoice)
+
+// ============================================================
+// FLOYD-WARSHALL EXPECTED OUTPUT
+//
+// Expected:
+//
+// Execution Time : 0.030783 ms
+// 0 33 31 ...
+// 9 0 1 ...
+//
+// We ignore ONLY the execution time line.
+// ============================================================
+
+vector<string> readExpectedFloydWarshall(
+    const string &path)
 {
-    string inputPath = "tests/" + testBaseName + ".txt";
-    string algoSubfolder = (algoChoice == 1) ? "Bellman-Ford" : "Floyd-Warshall";
-    string expectedPath = "tests/" + algoSubfolder + "/" + testBaseName + "_expected.txt";
+    vector<string> result;
 
-    CSRGraph graph(isWeighted);
+    ifstream file(path);
 
-    // 1. Time graph loading
-    auto loadStart = chrono::high_resolution_clock::now();
+    if (!file)
+        return result;
+
+    string line;
+
+    while (getline(file, line))
+    {
+        if (!line.empty() &&
+            line.back() == '\r')
+        {
+            line.pop_back();
+        }
+
+        if (line.rfind("Execution Time", 0) == 0)
+            continue;
+
+        if (line.empty())
+            continue;
+
+        result.push_back(line);
+    }
+
+    return result;
+}
+
+
+// ============================================================
+// GENERATE BELLMAN-FORD ACTUAL RESULT
+// ============================================================
+
+vector<string> generateBellmanFordResult(
+    const ShortestPathResult &result,
+    int source,
+    int vertices)
+{
+    vector<string> actual;
+
+    for (int i = 0;
+         i < vertices;
+         i++)
+    {
+        string line;
+
+        if (result.distances[i] >= GRAPH_INF)
+        {
+            line =
+                to_string(source) +
+                " -> " +
+                to_string(i) +
+                " : INF";
+        }
+        else
+        {
+            line =
+                to_string(source) +
+                " -> " +
+                to_string(i) +
+                " : " +
+                to_string(
+                    result.distances[i]);
+        }
+
+        actual.push_back(line);
+    }
+
+    return actual;
+}
+
+
+// ============================================================
+// GENERATE FLOYD-WARSHALL ACTUAL RESULT
+// ============================================================
+
+vector<string> generateFloydWarshallResult(
+    const AllPairsResult &result,
+    int vertices)
+{
+    vector<string> actual;
+
+    for (int i = 0;
+         i < vertices;
+         i++)
+    {
+        string row;
+
+        for (int j = 0;
+             j < vertices;
+             j++)
+        {
+            if (result.distances[i][j] >= GRAPH_INF)
+            {
+                row += "INF";
+            }
+            else
+            {
+                row +=
+                    to_string(
+                        result.distances[i][j]);
+            }
+
+            if (j != vertices - 1)
+                row += " ";
+        }
+
+        actual.push_back(row);
+    }
+
+    return actual;
+}
+
+
+// ============================================================
+// BELLMAN-FORD TEST
+// ============================================================
+
+void runBellmanFordTest(
+    const string &testName)
+{
+    string inputPath =
+        "tests/Bellman-Ford/" +
+        testName +
+        ".txt";
+
+    string expectedPath =
+        "expected/Bellman-Ford/" +
+        testName +
+        ".txt";
+
+
+    CSRGraph graph(true);
+
+
+    // --------------------------------------------------------
+    // Load input
+    // --------------------------------------------------------
+
     if (!graph.loadFromFile(inputPath))
     {
-        cerr << "Failed to load " << inputPath << "\n";
+        cout << left
+             << setw(18)
+             << (testName + ".txt")
+             << "ERROR: Invalid input file\n";
+
         return;
     }
-    auto loadEnd = chrono::high_resolution_clock::now();
-    double loadTime = chrono::duration<double, milli>(loadEnd - loadStart).count();
 
-    // 2. Time algorithm execution
-    auto algoStart = chrono::high_resolution_clock::now();
-    vector<string> actualOutput;
 
-    if (algoChoice == 1)
-    { // Bellman-Ford
-        int source = graph.getSource();
-        auto result = GraphAlgorithms::bellmanFord(graph, source);
-        auto algoEnd = chrono::high_resolution_clock::now();
-        double algoTime = chrono::duration<double, milli>(algoEnd - algoStart).count();
+    int source =
+        graph.getSource();
 
-        cout << "\n----------------------------------------\n";
-        cout << "Test: " << testBaseName << ".txt | Algorithm: Bellman-Ford\n";
-        cout << "Load Time: " << fixed << setprecision(3) << loadTime << " ms | ";
-        cout << "Execution Time: " << fixed << setprecision(3) << algoTime << " ms\n";
 
-        if (result.has_negative_cycle)
-        {
-            actualOutput.push_back("NEGATIVE_CYCLE");
-        }
-        else
-        {
-            for (int i = 0; i < graph.getVertices(); ++i)
-            {
-                if (result.distances[i] >= GRAPH_INF)
-                {
-                    actualOutput.push_back(trimTrailing(to_string(source) + " -> " + to_string(i) + " = INF"));
-                }
-                else
-                {
-                    actualOutput.push_back(trimTrailing(to_string(source) + " -> " + to_string(i) + " = " + to_string(result.distances[i])));
-                }
-            }
-        }
-    }
-    else if (algoChoice == 2)
-    { // Floyd-Warshall
-        auto result = GraphAlgorithms::floydWarshall(graph);
-        auto algoEnd = chrono::high_resolution_clock::now();
-        double algoTime = chrono::duration<double, milli>(algoEnd - algoStart).count();
+    // --------------------------------------------------------
+    // ONLY ALGORITHM IS TIMED
+    // --------------------------------------------------------
 
-        cout << "\n----------------------------------------\n";
-        cout << "Test: " << testBaseName << ".txt | Algorithm: Floyd-Warshall\n";
-        cout << "Load Time: " << fixed << setprecision(3) << loadTime << " ms | ";
-        cout << "Execution Time: " << fixed << setprecision(3) << algoTime << " ms\n";
+    auto start =
+        high_resolution_clock::now();
 
-        if (result.has_negative_cycle)
-        {
-            actualOutput.push_back("NEGATIVE_CYCLE");
-        }
-        else
-        {
-            for (int i = 0; i < graph.getVertices(); ++i)
-            {
-                string row = "";
-                for (int j = 0; j < graph.getVertices(); ++j)
-                {
-                    if (result.distances[i][j] >= GRAPH_INF)
-                        row += "INF ";
-                    else
-                        row += to_string(result.distances[i][j]) + " ";
-                }
-                actualOutput.push_back(trimTrailing(row));
-            }
-        }
-    }
+    ShortestPathResult result =
+        GraphAlgorithms::bellmanFord(
+            graph,
+            source);
 
-    // 3. Verification step
-    vector<string> expectedOutput = readExpectedOutput(expectedPath);
-    if (!expectedOutput.empty())
+    auto stop =
+        high_resolution_clock::now();
+
+
+    double executionTime =
+        duration<double, milli>(
+            stop - start).count();
+
+
+    // --------------------------------------------------------
+    // Actual result
+    // --------------------------------------------------------
+
+    vector<string> actual;
+
+    if (result.has_negative_cycle)
     {
-        bool match = (actualOutput == expectedOutput);
-        cout << "Verification: [" << (match ? "PASSED" : "FAILED") << "]\n";
+        actual.push_back(
+            "NEGATIVE_CYCLE");
     }
     else
     {
-        cout << "Verification: [NO EXPECTED FILE FOUND]\n";
+        actual =
+            generateBellmanFordResult(
+                result,
+                source,
+                graph.getVertices());
     }
-    cout << "----------------------------------------\n";
+
+
+    // --------------------------------------------------------
+    // Expected result
+    // --------------------------------------------------------
+
+    vector<string> expected =
+        readExpectedBellmanFord(
+            expectedPath);
+
+
+    bool pass =
+        (actual == expected);
+
+
+    // --------------------------------------------------------
+    // Report
+    // --------------------------------------------------------
+
+    cout << left
+         << setw(18)
+         << (testName + ".txt")
+
+         << setw(10)
+         << graph.getVertices()
+
+         << setw(10)
+         << graph.getEdges()
+
+         << setw(8)
+         << source
+
+         << setw(12)
+         << (result.has_negative_cycle
+                 ? "Yes"
+                 : "No")
+
+         << setw(14)
+         << fixed
+         << setprecision(5)
+         << executionTime
+
+         << (pass ? "PASS" : "FAIL")
+
+         << "\n";
 }
+
+
+// ============================================================
+// FLOYD-WARSHALL TEST
+// ============================================================
+
+void runFloydWarshallTest(
+    const string &testName)
+{
+    string inputPath =
+        "tests/Floyd-Warshall/" +
+        testName +
+        ".txt";
+
+    string expectedPath =
+        "expected/Floyd-Warshall/" +
+        testName +
+        ".txt";
+
+
+    CSRGraph graph(true);
+
+
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // Floyd-Warshall input is an adjacency matrix.
+    // --------------------------------------------------------
+
+    if (!graph.loadMatrixFromFile(
+            inputPath))
+    {
+        cout << left
+             << setw(18)
+             << (testName + ".txt")
+             << "ERROR: Invalid matrix file\n";
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // ONLY ALGORITHM IS TIMED
+    // --------------------------------------------------------
+
+    auto start =
+        high_resolution_clock::now();
+
+    AllPairsResult result =
+        GraphAlgorithms::floydWarshall(
+            graph);
+
+    auto stop =
+        high_resolution_clock::now();
+
+
+    double executionTime =
+        duration<double, milli>(
+            stop - start).count();
+
+
+    // --------------------------------------------------------
+    // Actual result
+    // --------------------------------------------------------
+
+    vector<string> actual;
+
+    if (result.has_negative_cycle)
+    {
+        actual.push_back(
+            "NEGATIVE_CYCLE");
+    }
+    else
+    {
+        actual =
+            generateFloydWarshallResult(
+                result,
+                graph.getVertices());
+    }
+
+
+    // --------------------------------------------------------
+    // Expected result
+    // --------------------------------------------------------
+
+    vector<string> expected =
+        readExpectedFloydWarshall(
+            expectedPath);
+
+
+    bool pass =
+        (actual == expected);
+
+
+    // --------------------------------------------------------
+    // Report
+    // --------------------------------------------------------
+
+    cout << left
+         << setw(18)
+         << (testName + ".txt")
+
+         << setw(10)
+         << graph.getVertices()
+
+         << setw(10)
+         << graph.getEdges()
+
+         << setw(12)
+         << (result.has_negative_cycle
+                 ? "Yes"
+                 : "No")
+
+         << setw(14)
+         << fixed
+         << setprecision(5)
+         << executionTime
+
+         << (pass ? "PASS" : "FAIL")
+
+         << "\n";
+}
+
+
+// ============================================================
+// MAIN
+// ============================================================
 
 int main()
 {
-    vector<string> testBases = {"test1", "test2", "test3", "test4", "test5"};
+    int choice;
 
-    int algoChoice;
-    cout << "Select Algorithm:\n1. Bellman-Ford\n2. Floyd-Warshall\nChoice: ";
-    cin >> algoChoice;
+    cout << "\n";
+    cout << "1. Bellman-Ford\n";
+    cout << "2. Floyd-Warshall\n\n";
 
-    // char isWeightedChar;
-    // cout << "Are graphs weighted? (y/n): ";
-    // cin >> isWeightedChar;
-    bool isWeighted = true;
+    cout << "Choice: ";
 
-    for (const auto &testName : testBases)
+    cin >> choice;
+
+
+    // ========================================================
+    // BELLMAN-FORD
+    // ========================================================
+
+    if (choice == 1)
     {
-        runTestCase(testName, isWeighted, algoChoice);
+        cout << "\n";
+        cout << "Bellman-Ford Results\n\n";
+
+        cout << left
+             << setw(18)
+             << "Test File"
+
+             << setw(10)
+             << "Vertices"
+
+             << setw(10)
+             << "Edges"
+
+             << setw(8)
+             << "Source"
+
+             << setw(12)
+             << "Neg Cycle"
+
+             << setw(14)
+             << "Time(ms)"
+
+             << "Status\n";
+
+        cout << string(82, '-')
+             << "\n";
+
+
+        runBellmanFordTest("bf_10");
+
+        runBellmanFordTest("bf_100");
+
+        runBellmanFordTest("bf_10000");
+
+        runBellmanFordTest("bf_50000");
+
+        runBellmanFordTest("bf_100000");
     }
+
+
+    // ========================================================
+    // FLOYD-WARSHALL
+    // ========================================================
+
+    else if (choice == 2)
+    {
+        cout << "\n";
+        cout << "Floyd-Warshall Results\n\n";
+
+        cout << left
+             << setw(18)
+             << "Test File"
+
+             << setw(10)
+             << "Vertices"
+
+             << setw(10)
+             << "Edges"
+
+             << setw(12)
+             << "Neg Cycle"
+
+             << setw(14)
+             << "Time(ms)"
+
+             << "Status\n";
+
+        cout << string(74, '-')
+             << "\n";
+
+
+        runFloydWarshallTest("fw_10");
+
+        runFloydWarshallTest("fw_100");
+
+        runFloydWarshallTest("fw_500");
+
+        runFloydWarshallTest("fw_1000");
+
+        runFloydWarshallTest("fw_2000");
+    }
+
+
+    // ========================================================
+    // INVALID
+    // ========================================================
+
+    else
+    {
+        cout << "Invalid choice.\n";
+        return 1;
+    }
+
+
+    cout << "\n";
+    cout << "All tests completed.\n";
 
     return 0;
 }

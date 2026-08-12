@@ -1,0 +1,14 @@
+Execution Time : 0.00792 ms
+Bellman-Ford Shortest Path Distances
+Source: 0
+
+0 -> 0 : 0
+0 -> 1 : 36
+0 -> 2 : 8
+0 -> 3 : 14
+0 -> 4 : 12
+0 -> 5 : 16
+0 -> 6 : 10
+0 -> 7 : 6
+0 -> 8 : 23
+0 -> 9 : 22

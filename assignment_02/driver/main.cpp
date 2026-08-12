@@ -142,10 +142,10 @@ int main()
     cout << "Select Algorithm:\n1. Bellman-Ford\n2. Floyd-Warshall\nChoice: ";
     cin >> algoChoice;
 
-    char isWeightedChar;
-    cout << "Are graphs weighted? (y/n): ";
-    cin >> isWeightedChar;
-    bool isWeighted = (isWeightedChar == 'y' || isWeightedChar == 'Y');
+    // char isWeightedChar;
+    // cout << "Are graphs weighted? (y/n): ";
+    // cin >> isWeightedChar;
+    bool isWeighted = true;
 
     for (const auto &testName : testBases)
     {

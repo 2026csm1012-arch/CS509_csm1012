@@ -1,9 +1,8 @@
 all:
-	g++ driver/main.cpp src/algorithm.cpp -o matrix
+	g++ driver/main.cpp src/algorithm.cpp -o build/assignment_01.exe
 
 clean:
-	rm -rf matrix.exe
+	rm -f build/assignment_01.exe
 
-run: 
-	.\matrix.exe
-
+run:
+	./build/assignment_01.exe

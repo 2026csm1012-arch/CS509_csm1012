@@ -51,15 +51,15 @@ int main()
 
     for (string filename : {"test (1).txt", "test (2).txt", "test (3).txt", "test (4).txt", "test (5).txt"})
     {
-        
+
         ifstream dimen("tests/" + filename);
 
         // ADDED: Safety check to prevent segmentation faults
-        if (!dimen.is_open()) {
+        if (!dimen.is_open())
+        {
             cerr << "Error: Could not open file " << filename << ". Check your file paths." << endl;
-            continue; 
+            continue;
         }
-
 
         dimen >> m >> n >> p;
         creating_matrix(a, b, c, m, n, p);
@@ -97,7 +97,7 @@ int main()
             break;
         }
 
-        //freeup memory
+        // freeup memory
         for (int i = 0; i < m; i++)
             delete[] a[i];
         delete[] a;

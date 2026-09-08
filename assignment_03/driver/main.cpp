@@ -79,6 +79,22 @@ static void runMSTTest(
              << " | Time: "
              << milliseconds
              << " ms\n";
+
+        ofstream output("output/MST/" + test_name + "_prim.txt");
+        if (output)
+        {
+            output << "Algorithm: Kruskal's Algorithm\n";
+            output << "Connected: " << (result.connected ? "YES" : "NO") << "\n";
+            output << "Edges:\n";
+
+            for (const MSTEdge &edge : result.edges)
+            {
+                output << edge.u << " " << edge.v << " "
+                       << edge.weight << "\n";
+            }
+
+            output << "Total MST weight: " << result.total_weight << "\n";
+        }
     }
     else if (choice == 2)
     {
@@ -101,6 +117,22 @@ static void runMSTTest(
              << " | Time: "
              << milliseconds
              << " ms\n";
+
+        ofstream output("output/MST/" + test_name + "_kruskal.txt");
+        if (output)
+        {
+            output << "Algorithm: Kruskal's Algorithm\n";
+            output << "Connected: " << (result.connected ? "YES" : "NO") << "\n";
+            output << "Edges:\n";
+
+            for (const MSTEdge &edge : result.edges)
+            {
+                output << edge.u << " " << edge.v << " "
+                       << edge.weight << "\n";
+            }
+
+            output << "Total MST weight: " << result.total_weight << "\n";
+        }
     }
 }
 

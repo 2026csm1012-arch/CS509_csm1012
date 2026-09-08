@@ -14,7 +14,8 @@ int main()
 
     cout << "1. Assignment 1\n";
     cout << "2. Assignment 2\n";
-    cout << "3. Assignment 3\n\n";
+    cout << "2. Assignment 3\n";
+    cout << "3. Assignment 4\n\n";
 
     cout << "Enter assignment number: ";
     cin >> choice;
@@ -52,6 +53,19 @@ int main()
 
         return system(
             "cd /d assignment_03 && build\\assignment_03.exe");
+
+            
+    case 4:
+        cout << "\nBuilding Assignment 4...\n";
+
+        if (system("make -C assignment_04") != 0)
+            return 1;
+
+        cout << "\nStarting Assignment 4...\n\n";
+
+        return system(
+            "cd /d assignment_03 && build\\assignment_04.exe");
+
     default:
         cout << "\nInvalid assignment number.\n";
         return 1;

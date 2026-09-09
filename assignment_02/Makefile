@@ -4,27 +4,45 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Isrc -O3
 SRC_DIR = src
 DRIVER_DIR = driver
 BUILD_DIR = build
-TARGET = $(BUILD_DIR)/assignment_02.exe
 
-SRCS = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(DRIVER_DIR)/*.cpp)
-OBJS = $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(wildcard $(SRC_DIR)/*.cpp)) \
-       $(patsubst $(DRIVER_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(wildcard $(DRIVER_DIR)/*.cpp))
+TARGET = assignment_02.exe
 
+
+# Source files
+SRC_FILES = $(wildcard $(SRC_DIR)/*.cpp)
+DRIVER_FILES = $(wildcard $(DRIVER_DIR)/*.cpp)
+
+# Object files
+SRC_OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/src/%.o,$(SRC_FILES))
+DRIVER_OBJECTS = $(patsubst $(DRIVER_DIR)/%.cpp,$(BUILD_DIR)/driver/%.o,$(DRIVER_FILES))
+
+OBJECTS = $(SRC_OBJECTS) $(DRIVER_OBJECTS)
+
+
+# Default target
 all: $(TARGET)
 
-$(TARGET): $(OBJS) | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+# Create executable
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(TARGET)
+
+
+# Compile src files
+$(BUILD_DIR)/src/%.o: $(SRC_DIR)/%.cpp
+	mkdir -p $(BUILD_DIR)/src
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(DRIVER_DIR)/%.cpp | $(BUILD_DIR)
+
+# Compile driver files
+$(BUILD_DIR)/driver/%.o: $(DRIVER_DIR)/%.cpp
+	mkdir -p $(BUILD_DIR)/driver
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
 
+# Remove compiled files
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(TARGET)
+
 
 .PHONY: all clean

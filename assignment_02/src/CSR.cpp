@@ -1,284 +1,282 @@
 #include "CSR.h"
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 using namespace std;
 
+// ============================================================
+// CONSTRUCTOR
+// ============================================================
 CSRGraph::CSRGraph(bool weighted)
-    : V(0),
-      E(0),
-      is_weighted(weighted),
-      source_vertex(0)
 {
+    V = 0;
+    E = 0;
+    is_weighted = weighted;
+    source_vertex = 0;
 }
 
-
 // ============================================================
-// BELLMAN-FORD INPUT
-//
-// Format:
-//
-// V E
-// vertex neighbour_count neighbour weight ...
-// ...
-// SOURCE source
+// LOAD BELLMAN-FORD FILE (Supports both Adjacency List & Edge List)
 // ============================================================
-
 bool CSRGraph::loadFromFile(const string &filepath)
-{
-    ifstream input_list(filepath);
-
-    if (!input_list.is_open())
-    {
-        cerr << "Error: Could not open file "
-             << filepath << "\n";
-
-        return false;
-    }
-
-    if (input_list.peek() == ifstream::traits_type::eof())
-    {
-        cerr << "Error: File "
-             << filepath
-             << " is empty.\n";
-
-        return false;
-    }
-
-    input_list >> V >> E;
-
-    string dummy;
-    getline(input_list, dummy);
-
-    offset.assign(V + 1, 0);
-    intermediaries.clear();
-    weights.clear();
-
-    string line;
-
-    int edge_counter = 0;
-
-    while (getline(input_list, line))
-    {
-        if (line.empty())
-            continue;
-
-        if (line.rfind("SOURCE", 0) == 0)
-        {
-            stringstream ss(line);
-
-            string prefix;
-
-            ss >> prefix >> source_vertex;
-
-            break;
-        }
-
-        stringstream node_details(line);
-
-        int node_index;
-        int neighbor_count;
-
-        node_details >>
-            node_index >>
-            neighbor_count;
-
-        offset[node_index] =
-            edge_counter;
-
-        for (int i = 0;
-             i < neighbor_count;
-             ++i)
-        {
-            int neighbor;
-            int w = 1;
-
-            if (is_weighted)
-            {
-                node_details >>
-                    neighbor >>
-                    w;
-
-                weights.push_back(w);
-            }
-            else
-            {
-                node_details >>
-                    neighbor;
-            }
-
-            intermediaries.push_back(
-                neighbor);
-
-            edge_counter++;
-        }
-    }
-
-    offset[V] =
-        edge_counter;
-
-    return true;
-}
-
-
-// ============================================================
-// FLOYD-WARSHALL INPUT
-//
-// Format:
-//
-// V
-// 0 INF 5 INF ...
-// INF 0 2  ...
-// ...
-//
-// The matrix is converted into CSR.
-//
-// INF means there is no edge.
-//
-// Diagonal values are not stored as edges.
-// ============================================================
-
-bool CSRGraph::loadMatrixFromFile(
-    const string &filepath)
 {
     ifstream input(filepath);
 
-    if (!input.is_open())
+    if (input.is_open() == false)
     {
-        cerr << "Error: Could not open file "
-             << filepath << "\n";
-
+        cout << "Error: Cannot open file " << filepath << "\n";
         return false;
     }
 
-    if (!(input >> V))
-    {
-        cerr << "Error: Invalid matrix file "
-             << filepath << "\n";
+    string line;
 
+    // 1. Read the very first line to determine the format
+    getline(input, line);
+
+    // Clean up carriage returns if they exist
+    if (!line.empty() && line.back() == '\r')
+    {
+        line.pop_back();
+    }
+
+    // ------------------------------------------------------------
+    // FORMAT A: EDGE LIST (Starts with 'D' for Directed or 'U' for Undirected)
+    // ------------------------------------------------------------
+    if (line == "D" || line == "U")
+    {
+        bool is_directed = true;
+        if (line == "U")
+        {
+            is_directed = false;
+        }
+
+        // Temporary 2D vectors to group edges because we don't know the total nodes yet
+        vector<vector<int>> temp_neighbors;
+        vector<vector<int>> temp_weights;
+        int total_edges = 0;
+        source_vertex = 0;
+
+        while (getline(input, line))
+        {
+            if (line == "" || line == "\r")
+                continue;
+
+            if (line.find("SOURCE") != string::npos)
+            {
+                stringstream ss(line);
+                string temp;
+                ss >> temp >> source_vertex;
+                break;
+            }
+
+            stringstream edgeData(line);
+            int u, v;
+            int w = 1;
+
+            if (is_weighted == true)
+            {
+                edgeData >> u >> v >> w;
+            }
+            else
+            {
+                edgeData >> u >> v;
+            }
+
+            // Find the highest node number to size our lists
+            int max_node = u;
+            if (v > max_node)
+                max_node = v;
+
+            int required_size = max_node + 1;
+            if (required_size > temp_neighbors.size())
+            {
+                temp_neighbors.resize(required_size);
+                temp_weights.resize(required_size);
+            }
+
+            // Store edge u -> v
+            temp_neighbors[u].push_back(v);
+            temp_weights[u].push_back(w);
+            total_edges++;
+
+            // If undirected, store v -> u
+            if (is_directed == false)
+            {
+                temp_neighbors[v].push_back(u);
+                temp_weights[v].push_back(w);
+                total_edges++;
+            }
+        }
+
+        // Build the final CSR arrays
+        V = temp_neighbors.size();
+        E = total_edges;
+        offset.assign(V + 1, 0);
+        intermediaries.clear();
+        weights.clear();
+
+        int edge_counter = 0;
+        for (int i = 0; i < V; i++)
+        {
+            offset[i] = edge_counter;
+            for (int j = 0; j < temp_neighbors[i].size(); j++)
+            {
+                intermediaries.push_back(temp_neighbors[i][j]);
+                weights.push_back(temp_weights[i][j]);
+                edge_counter++;
+            }
+        }
+        offset[V] = edge_counter;
+        return true;
+    }
+
+    // ------------------------------------------------------------
+    // FORMAT B: ADJACENCY LIST (Starts with "Vertices Edges")
+    // ------------------------------------------------------------
+    else
+    {
+        stringstream firstLine(line);
+        firstLine >> V >> E;
+
+        offset.assign(V + 1, 0);
+        intermediaries.clear();
+        weights.clear();
+        source_vertex = 0;
+
+        int edge_counter = 0;
+
+        while (getline(input, line))
+        {
+            if (line == "" || line == "\r")
+                continue;
+
+            if (line.find("SOURCE") != string::npos)
+            {
+                stringstream ss(line);
+                string temp;
+                ss >> temp >> source_vertex;
+                break;
+            }
+
+            stringstream nodeData(line);
+            int node_index;
+            int neighbor_count;
+
+            nodeData >> node_index >> neighbor_count;
+            offset[node_index] = edge_counter;
+
+            for (int i = 0; i < neighbor_count; i++)
+            {
+                int neighbor;
+                int weight = 1;
+
+                if (is_weighted == true)
+                {
+                    nodeData >> neighbor >> weight;
+                    weights.push_back(weight);
+                }
+                else
+                {
+                    nodeData >> neighbor;
+                }
+
+                intermediaries.push_back(neighbor);
+                edge_counter++;
+            }
+        }
+
+        offset[V] = edge_counter;
+        return true;
+    }
+}
+
+// ============================================================
+// LOAD FLOYD-WARSHALL MATRIX FILE
+// ============================================================
+bool CSRGraph::loadMatrixFromFile(const string &filepath)
+{
+    ifstream input(filepath);
+ 
+    if (input.is_open() == false)
+    {
+        cout << "Error: Cannot open file " << filepath << "\n";
         return false;
     }
+
+    input >> V;
 
     if (V <= 0)
     {
-        cerr << "Error: Invalid number of vertices.\n";
-
+        cout << "Error: Invalid number of vertices.\n";
         return false;
     }
 
     offset.assign(V + 1, 0);
-
     intermediaries.clear();
     weights.clear();
-
     E = 0;
     source_vertex = 0;
 
-    // --------------------------------------------------------
-    // Read matrix
-    // --------------------------------------------------------
-
-    for (int i = 0; i < V; ++i)
+    for (int i = 0; i < V; i++)
     {
-        offset[i] =
-            static_cast<int>(
-                intermediaries.size());
+        offset[i] = intermediaries.size();
 
-        for (int j = 0; j < V; ++j)
+        for (int j = 0; j < V; j++)
         {
             string value;
+            input >> value;
 
-            if (!(input >> value))
-            {
-                cerr << "Error: Matrix in "
-                     << filepath
-                     << " is incomplete.\n";
-
-                return false;
-            }
-
-            // No edge
             if (value == "INF")
                 continue;
-
-            int weight;
-
-            try
-            {
-                weight = stoi(value);
-            }
-            catch (...)
-            {
-                cerr << "Error: Invalid matrix value '"
-                     << value
-                     << "' in "
-                     << filepath
-                     << "\n";
-
-                return false;
-            }
-
-            // Don't store diagonal.
-            // Floyd-Warshall itself initializes
-            // dist[i][i] = 0.
             if (i == j)
-                continue;
+                continue; // Skip diagonal
+
+            int weight = stoi(value);
 
             intermediaries.push_back(j);
-
             weights.push_back(weight);
-
             E++;
         }
     }
 
-    offset[V] =
-        static_cast<int>(
-            intermediaries.size());
-
+    offset[V] = intermediaries.size();
     return true;
 }
 
-
 // ============================================================
-// PRINT CSR
+// PRINT CSR DATA
 // ============================================================
-
 void CSRGraph::printCSR() const
 {
-    cout << "--- CSR Representation ---\n";
-
-    cout << "Vertices: "
-         << V
-         << ", Edges: "
-         << E
-         << ", Source: "
-         << source_vertex
-         << "\n";
+    cout << "\n--- CSR Data ---\n";
+    cout << "Vertices: " << V << ", Edges: " << E << ", Source: " << source_vertex << "\n";
 
     cout << "Offsets:        ";
-
-    for (int i : offset)
-        cout << i << " ";
-
+    for (int i = 0; i < offset.size(); i++)
+    {
+        cout << offset[i] << " ";
+    }
     cout << "\n";
 
     cout << "Intermediaries: ";
-
-    for (int x : intermediaries)
-        cout << x << " ";
-
-    if (is_weighted)
+    for (int i = 0; i < intermediaries.size(); i++)
     {
-        cout << "\nWeights:        ";
-
-        for (int w : weights)
-            cout << w << " ";
+        cout << intermediaries[i] << " ";
     }
-
     cout << "\n";
 
-    cout << "--------------------------\n";
+    if (is_weighted == true)
+    {
+        cout << "Weights:        ";
+        for (int i = 0; i < weights.size(); i++)
+        {
+            cout << weights[i] << " ";
+        }
+        cout << "\n";
+    }
+
+    cout << "----------------\n";
 }

@@ -19,9 +19,10 @@ struct AllPairsResult
 
 class GraphAlgorithms
 {
-    public:
-        static ShortestPathResult bellmanFord(const CSRGraph &graph, int source);
-        static AllPairsResult floydWarshall(const CSRGraph &graph);
+public:
+    static ShortestPathResult bellmanFord(const CSRGraph &graph, int source);
+    static AllPairsResult floydWarshall(const CSRGraph &graph);
+    static AllPairsResult block_floydWarshall(const CSRGraph &graph, int block);
 };
 
 #endif

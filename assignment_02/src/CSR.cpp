@@ -91,7 +91,9 @@ bool CSRGraph::loadFromFile(const string &filepath)
                 max_node = v;
 
             int required_size = max_node + 1;
-            if (required_size > temp_neighbors.size())
+
+            // FIX: Added (int) cast to fix signedness warning
+            if (required_size > (int)temp_neighbors.size())
             {
                 temp_neighbors.resize(required_size);
                 temp_weights.resize(required_size);
@@ -122,7 +124,9 @@ bool CSRGraph::loadFromFile(const string &filepath)
         for (int i = 0; i < V; i++)
         {
             offset[i] = edge_counter;
-            for (int j = 0; j < temp_neighbors[i].size(); j++)
+
+            // FIX: Added (int) cast to fix signedness warning
+            for (int j = 0; j < (int)temp_neighbors[i].size(); j++)
             {
                 intermediaries.push_back(temp_neighbors[i][j]);
                 weights.push_back(temp_weights[i][j]);
@@ -199,7 +203,7 @@ bool CSRGraph::loadFromFile(const string &filepath)
 bool CSRGraph::loadMatrixFromFile(const string &filepath)
 {
     ifstream input(filepath);
- 
+
     if (input.is_open() == false)
     {
         cout << "Error: Cannot open file " << filepath << "\n";
@@ -255,14 +259,16 @@ void CSRGraph::printCSR() const
     cout << "Vertices: " << V << ", Edges: " << E << ", Source: " << source_vertex << "\n";
 
     cout << "Offsets:        ";
-    for (int i = 0; i < offset.size(); i++)
+    // FIX: Added (int) cast to fix signedness warning
+    for (int i = 0; i < (int)offset.size(); i++)
     {
         cout << offset[i] << " ";
     }
     cout << "\n";
 
     cout << "Intermediaries: ";
-    for (int i = 0; i < intermediaries.size(); i++)
+    // FIX: Added (int) cast to fix signedness warning
+    for (int i = 0; i < (int)intermediaries.size(); i++)
     {
         cout << intermediaries[i] << " ";
     }
@@ -271,7 +277,8 @@ void CSRGraph::printCSR() const
     if (is_weighted == true)
     {
         cout << "Weights:        ";
-        for (int i = 0; i < weights.size(); i++)
+        // FIX: Added (int) cast to fix signedness warning
+        for (int i = 0; i < (int)weights.size(); i++)
         {
             cout << weights[i] << " ";
         }

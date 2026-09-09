@@ -1,4 +1,4 @@
-Algorithm: Kruskal's Algorithm
+Algorithm: Prim's Algorithm
 Connected: YES
 Edges:
 0 1 -4

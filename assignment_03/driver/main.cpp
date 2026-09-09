@@ -1,5 +1,4 @@
 #include "../src/MST.h"
-
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -8,141 +7,152 @@
 using namespace std;
 using namespace chrono;
 
-static bool readExpectedMST(
-    const string &path,
-    long long &expected_weight)
+// ============================================================
+// HELPER: READ EXPECTED WEIGHT
+// ============================================================
+bool readExpectedMST(const string &path, long long &expected_weight)
 {
     ifstream file(path);
 
-    if (!file)
+    if (file.is_open() == false)
+    {
         return false;
+    }
 
     string key;
 
+    // Read the file word by word
     while (file >> key)
     {
+        // Look for the exact text "EXPECTED_WEIGHT"
         if (key == "EXPECTED_WEIGHT")
         {
-            return static_cast<bool>(file >> expected_weight);
+            file >> expected_weight;
+            return true;
         }
     }
 
     return false;
 }
 
-static void runMSTTest(
-    const string &test_name,
-    int choice)
+// ============================================================
+// HELPER: RUN TEST
+// ============================================================
+void runMSTTest(const string &test_name, int choice)
 {
-    const string input_path =
-        "tests/MST/" + test_name + ".txt";
+    // 1. Setup file paths
+    string input_path = "tests/MST/" + test_name + ".txt";
+    string expected_path = "expected/MST/" + test_name + ".txt";
 
-    const string expected_path =
-        "expected/MST/" + test_name + ".txt";
-
+    // 2. Load the graph (true means the graph has weights)
     CSRGraph graph(true);
+    bool is_loaded = graph.loadFromFile(input_path);
 
-    // Read input file
-    if (!graph.loadFromFile(input_path))
+    if (is_loaded == false)
     {
-        cout << test_name << " : FAIL\n";
+        cout << test_name << " : FAIL (Could not open input file)\n";
         return;
     }
 
-    // Read expected result
+    // 3. Read the expected correct weight
     long long expected_weight = 0;
+    bool has_expected = readExpectedMST(expected_path, expected_weight);
 
-    if (!readExpectedMST(expected_path, expected_weight))
+    if (has_expected == false)
     {
-        cout << test_name << " : FAIL\n";
+        cout << test_name << " : FAIL (Could not find expected weight file)\n";
         return;
     }
 
-    if (choice == 1)
+    // Variables to hold our algorithm's results
+    // Variables to hold our algorithm's results
+    MSTResult result;
+    result.total_weight = 0;
+    result.connected = false;
+
+    double milliseconds = 0.0;
+    string algo_name = "";
+    string output_path = "";
+
+    // 4. Run the chosen algorithm and time it
+    if (choice == 1) // Prim
     {
+        algo_name = "Prim's Algorithm";
+        output_path = "output/MST/" + test_name + "_prim.txt";
+
         auto start = high_resolution_clock::now();
-
-        MSTResult result =
-            MSTAlgorithms::prim(graph);
-
+        result = MSTAlgorithms::prim(graph);
         auto stop = high_resolution_clock::now();
 
-        double milliseconds =
-            duration<double, milli>(stop - start).count();
-
-        bool pass =
-            result.connected &&
-            result.total_weight == expected_weight;
-
-        cout << test_name << " : "
-             << (pass ? "PASS" : "FAIL")
-             << " | Time: "
-             << milliseconds
-             << " ms\n";
-
-        ofstream output("output/MST/" + test_name + "_prim.txt");
-        if (output)
-        {
-            output << "Algorithm: Kruskal's Algorithm\n";
-            output << "Connected: " << (result.connected ? "YES" : "NO") << "\n";
-            output << "Edges:\n";
-
-            for (const MSTEdge &edge : result.edges)
-            {
-                output << edge.u << " " << edge.v << " "
-                       << edge.weight << "\n";
-            }
-
-            output << "Total MST weight: " << result.total_weight << "\n";
-        }
+        milliseconds = duration<double, milli>(stop - start).count();
     }
-    else if (choice == 2)
+    else if (choice == 2) // Kruskal
     {
+        algo_name = "Kruskal's Algorithm";
+        output_path = "output/MST/" + test_name + "_kruskal.txt";
+
         auto start = high_resolution_clock::now();
-
-        MSTResult result =
-            MSTAlgorithms::kruskal(graph);
-
+        result = MSTAlgorithms::kruskal(graph);
         auto stop = high_resolution_clock::now();
 
-        double milliseconds =
-            duration<double, milli>(stop - start).count();
+        milliseconds = duration<double, milli>(stop - start).count();
+    }
 
-        bool pass =
-            result.connected &&
-            result.total_weight == expected_weight;
+    // 5. Check if our answer is correct
+    bool pass = false;
+    if (result.connected == true && result.total_weight == expected_weight)
+    {
+        pass = true;
+    }
 
-        cout << test_name << " : "
-             << (pass ? "PASS" : "FAIL")
-             << " | Time: "
-             << milliseconds
-             << " ms\n";
+    // 6. Print result to the screen
+    cout << test_name << " : ";
+    if (pass == true)
+    {
+        cout << "PASS";
+    }
+    else
+    {
+        cout << "FAIL";
+    }
+    cout << " | Time: " << milliseconds << " ms\n";
 
-        ofstream output("output/MST/" + test_name + "_kruskal.txt");
-        if (output)
+    // 7. Save detailed results to an output file
+    ofstream output(output_path);
+    if (output.is_open() == true)
+    {
+        output << "Algorithm: " << algo_name << "\n";
+
+        if (result.connected == true)
         {
-            output << "Algorithm: Kruskal's Algorithm\n";
-            output << "Connected: " << (result.connected ? "YES" : "NO") << "\n";
-            output << "Edges:\n";
-
-            for (const MSTEdge &edge : result.edges)
-            {
-                output << edge.u << " " << edge.v << " "
-                       << edge.weight << "\n";
-            }
-
-            output << "Total MST weight: " << result.total_weight << "\n";
+            output << "Connected: YES\n";
         }
+        else
+        {
+            output << "Connected: NO\n";
+        }
+
+        output << "Edges:\n";
+        for (int i = 0; i < (int)result.edges.size(); i++)
+        {
+            MSTEdge current = result.edges[i];
+            output << current.u << " " << current.v << " " << current.weight << "\n";
+        }
+
+        output << "Total MST weight: " << result.total_weight << "\n";
     }
 }
 
+// ============================================================
+// MAIN MENU
+// ============================================================
 int main()
 {
     int choice = 0;
 
     cout << "\n";
-    cout << "CS509 - Assignment 3\n";
-    cout << "===================\n\n";
+    cout << "CS509 - Assignment 3 (MST)\n";
+    cout << "==========================\n\n";
 
     cout << "1. Prim's Algorithm\n";
     cout << "2. Kruskal's Algorithm\n\n";
@@ -169,6 +179,7 @@ int main()
 
     cout << "--------------------------\n";
 
+    // Run tests
     runMSTTest("mst_10", choice);
     runMSTTest("mst_100", choice);
     runMSTTest("mst_10000", choice);

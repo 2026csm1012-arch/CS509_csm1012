@@ -5,7 +5,7 @@ SRC_DIR = src
 DRIVER_DIR = driver
 BUILD_DIR = build
 
-TARGET = $(BUILD_DIR)/assignment_03
+TARGET =  assignment_03
 
 SRC_FILES = \
 	$(SRC_DIR)/MST.cpp \
@@ -37,6 +37,6 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(TARGET)
 
 .PHONY: all clean

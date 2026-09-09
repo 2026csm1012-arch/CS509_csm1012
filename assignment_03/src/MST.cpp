@@ -1,11 +1,13 @@
 #include "MST.h"
-
 #include <algorithm>
-#include <numeric>
 #include <queue>
+#include <vector>
 
 using namespace std;
 
+// ============================================================
+// HELPER CLASS: DISJOINT SET (For Kruskal's Algorithm)
+// ============================================================
 class DisjointSet
 {
 private:
@@ -13,160 +15,234 @@ private:
     vector<int> rank_value;
 
 public:
-    explicit DisjointSet(int n)
-        : parent(n), rank_value(n, 0)
+    // Constructor: Set up the sets so every node is its own parent initially
+    DisjointSet(int n)
     {
-        iota(parent.begin(), parent.end(), 0);
+        parent.resize(n);
+        rank_value.assign(n, 0);
+
+        for (int i = 0; i < n; i++)
+        {
+            parent[i] = i;
+        }
     }
 
+    // Find the root parent of a node (with path compression)
     int find(int x)
     {
         if (parent[x] != x)
+        {
             parent[x] = find(parent[x]);
-
+        }
         return parent[x];
     }
 
+    // Merge two sets together. Returns true if they were merged, false if already together.
     bool unite(int a, int b)
     {
-        a = find(a);
-        b = find(b);
+        int root_a = find(a);
+        int root_b = find(b);
 
-        if (a == b)
+        // They are already in the same set (would create a cycle)
+        if (root_a == root_b)
+        {
             return false;
+        }
 
-        if (rank_value[a] < rank_value[b])
-            swap(a, b);
-
-        parent[b] = a;
-
-        if (rank_value[a] == rank_value[b])
-            rank_value[a]++;
+        // Attach the smaller tree under the larger tree
+        if (rank_value[root_a] < rank_value[root_b])
+        {
+            parent[root_a] = root_b;
+        }
+        else if (rank_value[root_a] > rank_value[root_b])
+        {
+            parent[root_b] = root_a;
+        }
+        else
+        {
+            parent[root_b] = root_a;
+            rank_value[root_a]++;
+        }
 
         return true;
     }
 };
 
-MSTResult MSTAlgorithms::kruskal(const CSRGraph &graph)
+// ============================================================
+// HELPER FUNCTION: SORT EDGES
+// ============================================================
+// Used by Kruskal's to sort edges from smallest weight to largest
+bool compareEdges(const MSTEdge &a, const MSTEdge &b)
 {
-    const int V = graph.getVertices();
-    const auto &offset = graph.getOffset();
-    const auto &targets = graph.getIntermediaries();
-    const auto &weights = graph.getWeights();
-
-    // Per assignment timing rules, edge extraction and sorting
-    // are intentionally inside the Kruskal routine.
-    vector<MSTEdge> edges;
-    edges.reserve(static_cast<size_t>(graph.getEdges()));
-
-    for (int u = 0; u < V; ++u)
+    if (a.weight != b.weight)
     {
-        for (int e = offset[u]; e < offset[u + 1]; ++e)
-        {
-            const int v = targets[e];
-
-            // MST input is undirected, so every edge occurs twice.
-            // Keep one copy.
-            if (u < v)
-            {
-                edges.push_back({u, v, weights[e]});
-            }
-        }
+        return a.weight < b.weight;
     }
-
-    sort(edges.begin(), edges.end(),
-         [](const MSTEdge &a, const MSTEdge &b)
-         {
-             if (a.weight != b.weight)
-                 return a.weight < b.weight;
-
-             if (a.u != b.u)
-                 return a.u < b.u;
-
-             return a.v < b.v;
-         });
-
-    DisjointSet dsu(V);
-
-    MSTResult result{{}, 0, false};
-    result.edges.reserve(static_cast<size_t>(V > 0 ? V - 1 : 0));
-
-    for (const MSTEdge &edge : edges)
+    if (a.u != b.u)
     {
-        if (dsu.unite(edge.u, edge.v))
-        {
-            result.edges.push_back(edge);
-            result.total_weight += edge.weight;
-
-            if (static_cast<int>(result.edges.size()) == V - 1)
-                break;
-        }
+        return a.u < b.u;
     }
-
-    result.connected = (V <= 1 ||
-                        static_cast<int>(result.edges.size()) == V - 1);
-
-    return result;
+    return a.v < b.v;
 }
 
-MSTResult MSTAlgorithms::prim(const CSRGraph &graph)
+// ============================================================
+// KRUSKAL'S ALGORITHM
+// ============================================================
+MSTResult MSTAlgorithms::kruskal(const CSRGraph &graph)
 {
-    const int V = graph.getVertices();
-    const auto &offset = graph.getOffset();
-    const auto &targets = graph.getIntermediaries();
-    const auto &weights = graph.getWeights();
+    int V = graph.getVertices();
+    const vector<int> &offset = graph.getOffset();
+    const vector<int> &targets = graph.getIntermediaries();
+    const vector<int> &weights = graph.getWeights();
 
-    MSTResult result{{}, 0, false};
+    vector<MSTEdge> edges;
 
-    if (V == 0)
-        return result;
-
-    vector<int> key(V, GRAPH_INF);
-    vector<int> parent(V, -1);
-    vector<bool> in_tree(V, false);
-
-    using HeapNode = pair<int, int>;
-    priority_queue<HeapNode, vector<HeapNode>, greater<HeapNode>> pq;
-
-    // Assignment recommends vertex 0 for reproducibility.
-    key[0] = 0;
-    pq.push({0, 0});
-
-    while (!pq.empty())
+    // 1. Extract all edges from the CSR graph
+    for (int u = 0; u < V; u++)
     {
-        auto [current_key, u] = pq.top();
-        pq.pop();
-
-        if (in_tree[u])
-            continue;
-
-        // Ignore stale priority-queue entries.
-        if (current_key != key[u])
-            continue;
-
-        in_tree[u] = true;
-
-        if (parent[u] != -1)
-        {
-            result.edges.push_back({parent[u], u, key[u]});
-            result.total_weight += key[u];
-        }
-
-        for (int e = offset[u]; e < offset[u + 1]; ++e)
+        for (int e = offset[u]; e < offset[u + 1]; e++)
         {
             int v = targets[e];
             int w = weights[e];
 
-            if (!in_tree[v] && w < key[v])
+            // The graph is undirected, so every edge appears twice (u->v and v->u).
+            // We only keep one copy by checking (u < v).
+            if (u < v)
             {
-                key[v] = w;
-                parent[v] = u;
-                pq.push({key[v], v});
+                MSTEdge new_edge;
+                new_edge.u = u;
+                new_edge.v = v;
+                new_edge.weight = w;
+
+                edges.push_back(new_edge);
             }
         }
     }
 
-    result.connected = (static_cast<int>(result.edges.size()) == V - 1);
+    // 2. Sort the edges by weight (smallest first)
+    sort(edges.begin(), edges.end(), compareEdges);
+
+    // 3. Build the Minimum Spanning Tree
+    DisjointSet dsu(V);
+
+    MSTResult result;
+    result.total_weight = 0;
+    result.connected = false;
+
+    for (int i = 0; i < (int)edges.size(); i++)
+    {
+        MSTEdge current_edge = edges[i];
+
+        // If uniting the nodes doesn't create a cycle, add the edge to our MST
+        if (dsu.unite(current_edge.u, current_edge.v) == true)
+        {
+            result.edges.push_back(current_edge);
+            result.total_weight += current_edge.weight;
+
+            // A spanning tree always has exactly (Vertices - 1) edges. Stop early.
+            if ((int)result.edges.size() == V - 1)
+            {
+                break;
+            }
+        }
+    }
+
+    // 4. Check if the graph was fully connected
+    if (V <= 1 || (int)result.edges.size() == V - 1)
+    {
+        result.connected = true;
+    }
+
+    return result;
+}
+
+// ============================================================
+// PRIM'S ALGORITHM
+// ============================================================
+MSTResult MSTAlgorithms::prim(const CSRGraph &graph)
+{
+    int V = graph.getVertices();
+    const vector<int> &offset = graph.getOffset();
+    const vector<int> &targets = graph.getIntermediaries();
+    const vector<int> &weights = graph.getWeights();
+
+    MSTResult result;
+    result.total_weight = 0;
+    result.connected = false;
+
+    if (V == 0)
+    {
+        return result;
+    }
+
+    // Arrays to track the best known weights and parents
+    vector<int> key(V, GRAPH_INF);
+    vector<int> parent(V, -1);
+    vector<bool> in_tree(V, false);
+
+    // Min-heap Priority Queue to always pick the smallest edge.
+    // It stores pairs of (weight, vertex).
+    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
+
+    // Start at vertex 0
+    key[0] = 0;
+    pq.push(make_pair(0, 0));
+
+    while (!pq.empty())
+    {
+        // Extract the node with the smallest weight
+        int current_key = pq.top().first;
+        int u = pq.top().second;
+        pq.pop();
+
+        // If we already added this node to the MST, skip it
+        if (in_tree[u] == true)
+        {
+            continue;
+        }
+
+        // Ignore stale entries in the priority queue
+        if (current_key != key[u])
+        {
+            continue;
+        }
+
+        // Mark the node as part of the tree
+        in_tree[u] = true;
+
+        // If this is not the starting node, record the edge
+        if (parent[u] != -1)
+        {
+            MSTEdge edge;
+            edge.u = parent[u];
+            edge.v = u;
+            edge.weight = key[u];
+
+            result.edges.push_back(edge);
+            result.total_weight += key[u];
+        }
+
+        // Check all neighbors of the current node
+        for (int e = offset[u]; e < offset[u + 1]; e++)
+        {
+            int v = targets[e];
+            int w = weights[e];
+
+            // If neighbor is not in tree yet, and we found a cheaper way to reach it
+            if (in_tree[v] == false && w < key[v])
+            {
+                key[v] = w;
+                parent[v] = u;
+                pq.push(make_pair(w, v));
+            }
+        }
+    }
+
+    // Check if we successfully connected all nodes
+    if ((int)result.edges.size() == V - 1)
+    {
+        result.connected = true;
+    }
 
     return result;
 }

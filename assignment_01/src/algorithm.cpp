@@ -1,21 +1,21 @@
 #include <iostream>
 #include <chrono>
-#include <algorithm> // Added for std::min
-#include <ctime>     // Added for clock_t and clock()
+#include <algorithm>
 
 using namespace std;
+using namespace chrono;
 
+// Normal Matrix Multiplication
 void GEMM(int **result, int **one, int **sec, int m, int n, int p)
 {
-
-    clock_t start, end;
-    start = clock();
+    auto start = high_resolution_clock::now();
 
     for (int i = 0; i < m; i++)
     {
         for (int j = 0; j < p; j++)
         {
             result[i][j] = 0;
+
             for (int k = 0; k < n; k++)
             {
                 result[i][j] += one[i][k] * sec[k][j];
@@ -23,20 +23,32 @@ void GEMM(int **result, int **one, int **sec, int m, int n, int p)
         }
     }
 
-    end = clock();
-    double duration = ((double)(end - start)) / CLOCKS_PER_SEC;
-    cout << "Time taken: " << duration * 1000 << " ms" << endl;
+    auto end = high_resolution_clock::now();
+
+    auto duration =
+        duration_cast<microseconds>(end - start);
+
+    cout << "GEMM Time: "
+         << duration.count()
+         << " us" << endl;
 }
 
-void blocking_matrix(int **result, int **one, int **sec, int m, int n, int p, int B)
+// Matrix Multiplication using Blocking
+void blocking_matrix(int **result, int **one, int **sec,
+                     int m, int n, int p, int B)
 {
+    auto start = high_resolution_clock::now();
 
-    auto start = chrono::high_resolution_clock::now();
-
+    // Set result matrix to 0
     for (int i = 0; i < m; i++)
+    {
         for (int j = 0; j < p; j++)
+        {
             result[i][j] = 0;
+        }
+    }
 
+    // Blocking
     for (int ii = 0; ii < m; ii += B)
     {
         for (int jj = 0; jj < p; jj += B)
@@ -49,7 +61,8 @@ void blocking_matrix(int **result, int **one, int **sec, int m, int n, int p, in
                     {
                         for (int k = kk; k < min(kk + B, n); k++)
                         {
-                            result[i][j] += one[i][k] * sec[k][j];
+                            result[i][j] +=
+                                one[i][k] * sec[k][j];
                         }
                     }
                 }
@@ -57,12 +70,12 @@ void blocking_matrix(int **result, int **one, int **sec, int m, int n, int p, in
         }
     }
 
-    auto end = chrono::high_resolution_clock::now();
+    auto end = high_resolution_clock::now();
 
-auto duration =
-chrono::duration_cast<chrono::microseconds>(end-start);
+    auto duration =
+        duration_cast<microseconds>(end - start);
 
-cout << duration.count() << " us";
-
-
+    cout << "Blocking Time: "
+         << duration.count()
+         << " us" << endl;
 }

@@ -13,13 +13,14 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-// Helper to safely clear bad input
+// Helper to safely clear bad input from the cin stream and prevent infinite loops
 static void safeCinWait()
 {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
+// Executes all pre-defined Vertex Coloring test datasets and measures execution time
 static void runColoring()
 {
     const string names[] = {
@@ -45,6 +46,7 @@ static void runColoring()
 
         try
         {
+            // Read input file, convert to CSR format, and execute greedy coloring
             Graph g = readUnweightedGraph(path, true);
             CSRGraph csr = convertToCSR(g);
 
@@ -67,6 +69,7 @@ static void runColoring()
     }
 }
 
+// Executes all pre-defined PageRank test datasets and measures execution time
 static void runPageRank()
 {
     const string names[] = {
@@ -92,6 +95,7 @@ static void runPageRank()
 
         try
         {
+            // Read graph configuration, convert to CSR, and run PageRank iterations
             PageRankInput in = readPageRankGraph(path);
             CSRGraph csr = convertToCSR(in.graph);
 
@@ -119,6 +123,7 @@ static void runPageRank()
     }
 }
 
+// Main interactive menu loop for the Assignment 4 test runner driver
 int main()
 {
     while (true)

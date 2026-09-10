@@ -4,20 +4,36 @@
 #include <vector>
 #include "CSR.h"
 
-struct ColoringResult {
-    std::vector<int> color;
-    int colorsUsed = 0;
-    bool valid = false;
+using namespace std;
+
+// ============================================================
+// RESULT STRUCTURES
+// ============================================================
+
+// Holds the final results for the Vertex Coloring algorithm
+struct ColoringResult
+{
+    vector<int> color;  // The color assigned to each vertex (e.g., 0, 1, 2...)
+    int colorsUsed = 0; // Total number of different colors needed
+    bool valid = false; // True if the coloring is correct (no connected nodes share the same color)
 };
 
-struct PageRankResult {
-    std::vector<double> rank;
-    int iterations = 0;
-    bool converged = false;
+// Holds the final results for the PageRank algorithm
+struct PageRankResult
+{
+    vector<double> rank;    // The final PageRank score for each vertex
+    int iterations = 0;     // How many loops it took to finish
+    bool converged = false; // True if the scores stabilized successfully before hitting the max limit
 };
 
-ColoringResult greedyColoring(const CSRGraph& graph);
-PageRankResult pageRank(const CSRGraph& graph, double damping,
-                        double tolerance, int maxIterations);
+// ============================================================
+// ALGORITHM DEFINITIONS
+// ============================================================
+
+// 1. Greedy Vertex Coloring (Welsh-Powell)
+ColoringResult greedyColoring(const CSRGraph &graph);
+
+// 2. PageRank Algorithm
+PageRankResult pageRank(const CSRGraph &graph, double damping, double tolerance, int maxIterations);
 
 #endif

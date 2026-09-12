@@ -50002,4 +50002,4 @@ Vertex colors:
 49999 1
 Colors used: 5
 Valid: true
-Execution time: 11.883900 ms
+Execution time: 6.943000 ms
